@@ -67,10 +67,12 @@ private:
   {
     float4x4 projView;
     float4x4 model;
+    float time;
   } pushConst2M;
 
   float4x4 m_worldViewProj;
   float4x4 m_lightMatrix;    
+  float m_time;
 
   UniformParams m_uniforms {};
   void* m_uboMappedMem = nullptr;
