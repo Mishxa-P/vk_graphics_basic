@@ -10,7 +10,7 @@
 
 static float findAverage(float v1, float v2, float v3, float v4, float v5, float v6, float v7)
 {
-  return (v1 + v2 + v3 + v4 + v5 + v6 + v7) / 7;
+  return (v1 + v2 + v3 + v4 + v5 + v6 + v7) / 7.0f;
 }
 
 SimpleCompute::SimpleCompute(uint32_t a_length) : m_length(a_length)
@@ -101,16 +101,18 @@ void SimpleCompute::SetupSimplePipeline()
 
   // Заполнение буферов
   std::vector<float> values(m_length);
+  m_values = std::vector<float>(m_length);
   srand(time(NULL));
   for (uint32_t i = 0; i < values.size(); ++i)
   {
     values[i] = (float(rand()) / RAND_MAX) * 100;
+    m_values[i] = values[i];
   }
   m_pCopyHelper->UpdateBuffer(m_A, 0, values.data(), sizeof(float) * values.size());
 
   for (uint32_t i = 0; i < values.size(); ++i)
   {
-    values[i] = 0.f;
+    values[i] = 0.0f;
   }
   m_pCopyHelper->UpdateBuffer(m_B, 0, values.data(), sizeof(float) * values.size());
 }
@@ -131,7 +133,7 @@ void SimpleCompute::BuildCommandBufferSimple(VkCommandBuffer a_cmdBuff, VkPipeli
 
   vkCmdPushConstants(a_cmdBuff, m_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(m_length), &m_length);
 
-  vkCmdDispatch(a_cmdBuff, (m_length - 1) / 1000 + 1, 1, 1);
+  vkCmdDispatch(a_cmdBuff, (m_length - 1) / 1024 + 1, 1, 1);
 
   VK_CHECK_RESULT(vkEndCommandBuffer(a_cmdBuff));
 }
@@ -237,7 +239,7 @@ void SimpleCompute::Execute()
   std::vector<float> values(m_length);
   m_pCopyHelper->ReadBuffer(m_res, 0, values.data(), sizeof(float) * values.size());
 
-  float sum = 0.f;
+  float sum = 0.0f;
   for (int i = 0; i < m_length; i++)
   {
     sum += values[i];
@@ -247,31 +249,25 @@ void SimpleCompute::Execute()
   std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
   std::cout << "Time spent with compute shader = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << " [microseconds] " << std::endl;
 
-  std::vector<float> valuesA(m_length);
   std::vector<float> valuesB(m_length);
 
   float arg1, arg2, arg3, arg4, arg5, arg6, arg7 = 0.0f;
-  sum = 0.f;
-  for (int i = 0; i < m_length; ++i)
-  {
-    valuesA[i] = (float(rand()) / RAND_MAX) * 100;
-  }
-
+  sum = 0.0f;
+ 
   begin = std::chrono::steady_clock::now();
 
-  for (int i = 0; i < m_length; ++i)
+  for (int i = 0; i < m_length; i++)
   {
-    arg1       = i - 3 < 0 ? 0.0f : valuesA[i - 3];
-    arg2       = i - 2 < 0 ? 0.0f : valuesA[i - 2];
-    arg3       = i - 1 < 0 ? 0.0f : valuesA[i - 1];
-    arg4       = valuesA[i];
-    arg5       = i + 1 >= values.size() ? 0.0f : valuesA[i + 1];
-    arg6       = i + 2 >= values.size() ? 0.0f : valuesA[i + 2];
-    arg7       = i + 3 >= values.size() ? 0.0f : valuesA[i + 3];
+    arg1       = i - 3 < 0 ? 0.0f : m_values[i - 3];
+    arg2       = i - 2 < 0 ? 0.0f : m_values[i - 2];
+    arg3       = i - 1 < 0 ? 0.0f : m_values[i - 1];
+    arg4       = m_values[i];
+    arg5       = i + 1 >= values.size() ? 0.0f : m_values[i + 1];
+    arg6       = i + 2 >= values.size() ? 0.0f : m_values[i + 2];
+    arg7       = i + 3 >= values.size() ? 0.0f : m_values[i + 3];
     valuesB[i] = findAverage(arg1, arg2, arg3, arg4, arg5, arg6, arg7);
-    sum += valuesA[i] - valuesB[i];
+    sum += m_values[i] - valuesB[i];
   }
-
   std::cout << "Sum without compute shader = " << sum << std::endl;
   end = std::chrono::steady_clock::now();
   std::cout << "Time spent without compute shader = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << " [microseconds] " << std::endl;
