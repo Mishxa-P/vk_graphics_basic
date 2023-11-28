@@ -46,9 +46,13 @@ public:
 private:
   etna::GlobalContext* m_context;
   etna::Image mainViewDepth;
+  etna::Image preBlurImage;
+  etna::Image finalImage;
   etna::Image shadowMap;
   etna::Sampler defaultSampler;
   etna::Buffer constants;
+  etna::Buffer gaussCoeffs;
+  int m_blur_window_size = 11;
 
   VkCommandPool    m_commandPool    = VK_NULL_HANDLE;
 
@@ -77,7 +81,7 @@ private:
 
   etna::GraphicsPipeline m_basicForwardPipeline {};
   etna::GraphicsPipeline m_shadowPipeline {};
-
+  etna::ComputePipeline m_blurPipeline{};
   std::shared_ptr<vk_utils::DescriptorMaker> m_pBindings = nullptr;
   
   VkSurfaceKHR m_surface = VK_NULL_HANDLE;

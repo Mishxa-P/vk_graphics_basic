@@ -1,0 +1,161 @@
+#version 430
+
+layout(local_size_x = 32, local_size_y = 32) in;
+
+const int size = 11;
+const int WindowSize = size * 2 + 1;
+
+layout(rgba32f, binding = 0) uniform readonly image2D sourceImage;
+layout(rgba32f, binding = 1) uniform writeonly image2D blurredImage;
+layout(binding = 2) uniform gaussCoeffsBlock 
+{
+    vec4 gaussCoeffs[WindowSize / 4 + 1];
+};
+
+shared vec3 sharedImage[32 + WindowSize - 1][32 + WindowSize - 1];
+
+float getGaussCoeff(uint i) 
+{
+    return gaussCoeffs[i / 4][uint(mod(i, 4))];
+}
+
+void loadSharedImage(uvec2 globalID, uvec2 localID, uvec2 workGroupSize, ivec2 imageSize) 
+{
+    sharedImage[localID.y + size][localID.x + size] = imageLoad(sourceImage, ivec2(globalID)).rgb;
+
+    // Handle left boundary
+    if (localID.x < size) 
+	{
+        if (globalID.x < size)
+            sharedImage[localID.y + size][localID.x] = vec3(0.0);
+        else
+            sharedImage[localID.y + size][localID.x] = imageLoad(sourceImage, ivec2(globalID.x - size, globalID.y)).rgb;
+    }
+
+    // Handle top boundary
+    if (localID.y < size) 
+	{
+        if (globalID.y < size)
+            sharedImage[localID.y][localID.x + size] = vec3(0.0);
+        else
+            sharedImage[localID.y][localID.x + size] = imageLoad(sourceImage, ivec2(globalID.x, globalID.y - size)).rgb;
+    }
+
+    // Handle top-left boundary
+    if (localID.x < size && localID.y < size) 
+	{
+        if (globalID.x < size || globalID.y < size)
+            sharedImage[localID.y][localID.x] = vec3(0.0);
+        else
+            sharedImage[localID.y][localID.x] = imageLoad(sourceImage, ivec2(globalID.x - size, globalID.y - size)).rgb;
+    }
+	
+	// Handle right boundary
+	if (localID.x > workGroupSize.x - size - 1) 
+	{
+		if (globalID.x + size > imageSize.x - 1)
+			sharedImage[localID.y + size][localID.x + 2 * size] = vec3(0.0);
+		else
+			sharedImage[localID.y + size][localID.x + 2 * size] = imageLoad(sourceImage, ivec2(globalID.x + size, globalID.y)).rgb;
+	}
+
+	// Handle bottom boundary
+	if (localID.y > workGroupSize.y - size - 1)
+	{
+		if (globalID.y + size > imageSize.y - 1)
+			sharedImage[localID.y + 2 * size][localID.x + size] = vec3(0.0);
+		else
+			sharedImage[localID.y + 2 * size][localID.x + size] = imageLoad(sourceImage, ivec2(globalID.x, globalID.y + size)).rgb;
+	}
+
+	// Handle bottom-right boundary
+	if (localID.x > workGroupSize.x - size - 1 && localID.y > workGroupSize.y - size - 1)
+	{
+		if (globalID.x + size > imageSize.x - 1 || globalID.y + size > imageSize.y - 1)
+			sharedImage[localID.y + 2 * size][localID.x + 2 * size] = vec3(0.0);
+		else
+			sharedImage[localID.y + 2 * size][localID.x + 2 * size] = imageLoad(sourceImage, ivec2(globalID.x + size, globalID.y + size)).rgb;
+	}
+
+	// Handle top-right boundary
+	if (localID.x > workGroupSize.x - size - 1 && localID.y < size) 
+	{
+		if (globalID.x + size > imageSize.x - 1 || globalID.y < size)
+			sharedImage[localID.y][localID.x + 2 * size] = vec3(0.0);
+		else
+			sharedImage[localID.y][localID.x + 2 * size] = imageLoad(sourceImage, ivec2(globalID.x + size, globalID.y - size)).rgb;
+	}
+
+	// Handle bottom-left boundary
+	if (localID.x < size && localID.y > workGroupSize.y - size - 1) 
+	{
+		if (globalID.x < size || globalID.y + size > imageSize.y - 1)
+			sharedImage[localID.y + 2 * size][localID.x] = vec3(0.0);
+		else
+			sharedImage[localID.y + 2 * size][localID.x] = imageLoad(sourceImage, ivec2(globalID.x - size, globalID.y + size)).rgb;
+	} 
+}
+
+void storeSharedImageToOutput(ivec2 globalID, ivec2 localID) 
+{
+    imageStore(blurredImage, ivec2(globalID), vec4(sharedImage[localID.y + size][localID.x + size], 1.0));
+}
+
+void verticalBlurPass(uvec2 globalID, uvec2 localID, ivec2 imageSize, uint x)
+ {
+    float gaussSum = 0.0;
+    vec3 gaussColor = vec3(0.0);
+
+    for (int y = 0; y < WindowSize; y++) {
+        gaussColor += getGaussCoeff(y) * sharedImage[localID.y + y][x];
+        if (globalID.y + y >= size && globalID.y - size + y <= imageSize.y)
+            gaussSum += getGaussCoeff(y);
+    }
+
+    barrier();
+
+    sharedImage[localID.y + size][x] = gaussColor / gaussSum;
+}
+
+void horizontalBlurPass(uvec2 globalID, uvec2 localID, ivec2 imageSize, uint y)
+ {
+    float gaussSum = 0.0;
+    vec3 gaussColor = vec3(0.0);
+
+    for (int x = 0; x < WindowSize; x++) {
+        gaussColor += getGaussCoeff(x) * sharedImage[y][localID.x + x];
+        if (globalID.x + x >= size && globalID.x - size + x <= imageSize.x)
+            gaussSum += getGaussCoeff(x);
+    }
+
+    barrier();
+
+    sharedImage[y][localID.x + size] = gaussColor / gaussSum;
+}
+
+void main() 
+{
+    ivec2 globalID = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 localID = ivec2(gl_LocalInvocationID.xy);
+    ivec2 workGroupSize = ivec2(gl_WorkGroupSize.xy);
+    ivec2 imageSize = imageSize(sourceImage);
+
+    if (globalID.x < imageSize.x && globalID.y < imageSize.y) 
+	{
+        loadSharedImage(uvec2(globalID), uvec2(localID), uvec2(workGroupSize), imageSize);
+        barrier();
+
+        horizontalBlurPass(uvec2(globalID), uvec2(localID), imageSize, localID.y + size);
+
+        if (localID.y < size && globalID.y >= size)
+            horizontalBlurPass(uvec2(globalID), uvec2(localID), imageSize, localID.y);
+        if (localID.y > workGroupSize.y - size - 1 && globalID.y + size <= imageSize.y - 1)
+            horizontalBlurPass(uvec2(globalID), uvec2(localID), imageSize, localID.y + 2 * size);
+        barrier();
+
+        verticalBlurPass(uvec2(globalID), uvec2(localID), imageSize, localID.x + size);
+        barrier();
+
+        storeSharedImageToOutput(ivec2(globalID), ivec2(localID));
+    }
+}
