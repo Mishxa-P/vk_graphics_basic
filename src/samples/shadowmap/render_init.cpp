@@ -6,6 +6,9 @@
 SimpleShadowmapRender::SimpleShadowmapRender(uint32_t a_width, uint32_t a_height) : m_width(a_width), m_height(a_height)
 {
   m_uniforms.baseColor = LiteMath::float3(0.9f, 0.92f, 1.0f);
+  m_uniforms.innerSpotlightAngle = cos(innerSpotlightAngle * M_PI / 180.0);
+  m_uniforms.outerSpotlightAngle = cos(outerSpotlightAngle * M_PI / 180.0);
+  m_light.cam.pos                = LiteMath::float3(0.0f, 1.0f, 5.0f);
 }
 
 void SimpleShadowmapRender::InitVulkan(const char** a_instanceExtensions, uint32_t a_instanceExtensionsCount, uint32_t)

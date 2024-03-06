@@ -69,6 +69,8 @@ private:
     float4x4 model;
   } pushConst2M;
 
+  float innerSpotlightAngle = 1.f;
+  float outerSpotlightAngle = 10.f;
   float4x4 m_worldViewProj;
   float4x4 m_lightMatrix;    
 
