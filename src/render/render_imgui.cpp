@@ -78,9 +78,10 @@ void ImGuiRender::InitImGui()
   m_drawGUICmdBuffers = vk_utils::createCommandBuffers(m_device, m_commandPool, m_swapchain->GetImageCount());
 
   g_instance = m_instance;
+  init_info.RenderPass = m_renderpass;
 
   ImGui_ImplVulkan_LoadFunctions(vulkanLoaderFunction);
-  ImGui_ImplVulkan_Init(&init_info, m_renderpass);
+  ImGui_ImplVulkan_Init(&init_info);
 
   // Upload GUI fonts texture
   ImGui_ImplVulkan_CreateFontsTexture();
