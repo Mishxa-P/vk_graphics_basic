@@ -26,19 +26,19 @@ void SimpleShadowmapRender::AllocateResources()
   shadowMap = m_context->createImage(etna::Image::CreateInfo
   {
     .extent = vk::Extent3D{2048, 2048, 1},
-    .name = "shadow_map",
-    .format = vk::Format::eD16Unorm,
+    .name   = "shadow_map",
+    .format   = vk::Format::eD32Sfloat,
     .imageUsage = vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled
   });
-  VSM = m_context->createImage(etna::Image::CreateInfo
+  VSM  = m_context->createImage(etna::Image::CreateInfo
   {
-    .extent     = vk::Extent3D{2048, 2048, 1},
-    .name       = "vsm",
-    .format     = vk::Format::eR16G16Unorm,
-    .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled 
+    .extent = vk::Extent3D{2048, 2048, 1},
+    .name   = "vsm",
+    .format     = vk::Format::eR32G32B32A32Sfloat,
+    .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled
   });
- 
-  defaultSampler = etna::Sampler(etna::Sampler::CreateInfo{.name = "default_sampler"});
+
+  defaultSampler = etna::Sampler(etna::Sampler::CreateInfo{ .filter = vk::Filter::eLinear, .name = "default_sampler" });
   constants = m_context->createBuffer(etna::Buffer::CreateInfo
   {
     .size = sizeof(UniformParams),
@@ -122,7 +122,7 @@ void SimpleShadowmapRender::SetupSimplePipeline()
       .fragmentShaderOutput =
         {
           .colorAttachmentFormats = {static_cast<vk::Format>(m_swapchain.GetFormat())},
-          .depthAttachmentFormat = vk::Format::eD32Sfloat
+          .depthAttachmentFormat  = vk::Format::eD32Sfloat
         }
     });
   m_shadowPipeline = pipelineManager.createGraphicsPipeline("simple_shadow",
@@ -130,15 +130,15 @@ void SimpleShadowmapRender::SetupSimplePipeline()
       .vertexShaderInput = sceneVertexInputDesc,
       .fragmentShaderOutput =
         {
-          .depthAttachmentFormat = vk::Format::eD16Unorm
+          .depthAttachmentFormat = vk::Format::eD32Sfloat
         }
     });
   m_VSMInitPipeline = pipelineManager.createGraphicsPipeline("vsm_init",
     { .vertexShaderInput = sceneVertexInputDesc,
       .fragmentShaderOutput = 
       {
-         .colorAttachmentFormats = {vk::Format::eR16G16Unorm},
-         .depthAttachmentFormat  = vk::Format::eD16Unorm 
+         .colorAttachmentFormats = { vk::Format::eR32G32B32A32Sfloat },
+         .depthAttachmentFormat  = vk::Format::eD32Sfloat
       } 
     });
 
@@ -147,7 +147,7 @@ void SimpleShadowmapRender::SetupSimplePipeline()
       .fragmentShaderOutput = 
       {
         .colorAttachmentFormats = {static_cast<vk::Format>(m_swapchain.GetFormat())},
-        .depthAttachmentFormat  = vk::Format::eD32Sfloat 
+        .depthAttachmentFormat  = vk::Format::eD32Sfloat
       } 
     });
 }

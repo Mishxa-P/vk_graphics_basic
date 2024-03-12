@@ -28,15 +28,26 @@ void main()
   const vec2 shadowTexCoord    = posLightSpaceNDC.xy*0.5f + vec2(0.5f, 0.5f);          
   const bool  outOfView = (shadowTexCoord.x < 0.0001f || shadowTexCoord.x > 0.9999f || shadowTexCoord.y < 0.0091f || shadowTexCoord.y > 0.9999f);
 
-  vec4 clr = vec4(Params.baseColor, 1.0f);
-  vec2	vsm  = textureLod(shadowMap, shadowTexCoord, 1).xy;
+  vec2	vsm  = textureLod(shadowMap, shadowTexCoord, 0).xy;
   float mu = vsm.x;
   float s2 = vsm.y - mu * mu;
   float pmax = s2 / (s2 + (posLightSpaceNDC.z - mu) * (posLightSpaceNDC.z - mu));
 
-  out_fragColor = clr;
-  if (posLightSpaceNDC.z >= vsm.x)
+  float shadow;
+  if (((posLightSpaceNDC.z < mu + 0.001f) || outOfView)) 
   {
-    out_fragColor   =  vec4(vec3(pmax), 1.0) * clr;
+    shadow = 1.0f;
+  } else 
+  {
+    shadow = pmax;
   }
+  const vec4 dark_violet = vec4(0.59f, 0.0f, 0.82f, 1.0f);
+  const vec4 chartreuse  = vec4(0.5f, 1.0f, 0.0f, 1.0f);
+
+  vec4 lightColor1 = mix(dark_violet, chartreuse, abs(sin(Params.time)));
+  vec4 lightColor2 = vec4(1.0f, 1.0f, 1.0f, 1.0f);
+
+  vec3 lightDir   = normalize(Params.lightPos - surf.wPos);
+  vec4 lightColor = max(dot(surf.wNorm, lightDir), 0.0f) * lightColor1;
+  out_fragColor   = (lightColor*shadow + vec4(0.1f)) * vec4(Params.baseColor, 1.0f);
 }
