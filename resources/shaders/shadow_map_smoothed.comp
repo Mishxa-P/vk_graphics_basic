@@ -1,0 +1,34 @@
+#version 450
+
+layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+
+layout(binding = 0) uniform sampler2D shadowMap;
+
+layout(binding = 1, rgba32f) uniform image2D shadowMapSmoothed;
+
+void main()
+{
+    ivec2 cord = ivec2(gl_GlobalInvocationID.xy);
+
+    const int filterSize = 3;
+
+    highp float sum = 0.0;
+    highp float sum2 = 0.0;
+
+    for (int i = -filterSize; i <= filterSize; i++) 
+    {
+        for (int j = -filterSize; j <= filterSize; j++)
+        {
+            highp vec4 texel = texelFetch(shadowMap, cord + ivec2(i, j), 0);
+            sum += texel.x;
+            sum2 += texel.x * texel.x;
+        }
+    }
+
+    const highp float numPixels = float((2 * filterSize + 1) * (2 * filterSize + 1));
+
+    sum /= numPixels;
+    sum2 /= numPixels;
+
+    imageStore(shadowMapSmoothed, cord, vec4(sum, sum2, 0, 0));
+}

@@ -48,6 +48,7 @@ private:
   etna::Image mainViewDepth;
   etna::Image shadowMap;
   etna::Image VSM;
+  etna::Image VSMSmoothed;
   etna::Sampler defaultSampler;
   etna::Buffer constants;
 
@@ -80,6 +81,7 @@ private:
   etna::GraphicsPipeline m_basicForwardPipeline {};
   etna::GraphicsPipeline m_shadowPipeline {};
   etna::GraphicsPipeline m_VSMInitPipeline{};
+  etna::ComputePipeline m_ShadowMapSmoothedPipeline{};
   etna::GraphicsPipeline m_VSMPipeline{};
   
   VkSurfaceKHR m_surface = VK_NULL_HANDLE;

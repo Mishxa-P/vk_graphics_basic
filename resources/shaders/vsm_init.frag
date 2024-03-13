@@ -6,5 +6,5 @@ void main (void)
 {
     float z = gl_FragCoord.z;
 
-    fragColor = vec4 ( z, z*z, z, 1.0 );
+    fragColor = vec4 ( z, z*z, 0.0, 1.0 );
 }
