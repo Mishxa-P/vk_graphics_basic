@@ -67,7 +67,17 @@ private:
   {
     float4x4 projView;
     float4x4 model;
+    float3 color;
   } pushConst2M;
+
+  bool m_useSubsurfaceScattering{true};
+  std::vector<float3> colors{
+    { 0.623, 0.459, 0.512  },
+    { 0.369, 0.780, 0.539 },
+    { 0.455, 0.345, 0.708 },
+    { 0.441, 0.651, 0.522 },
+    { 0.572, 0.188, 0.172 }
+  };
 
   float4x4 m_worldViewProj;
   float4x4 m_lightMatrix;    

@@ -6,6 +6,13 @@
 
 layout(location = 0) out vec4 out_fragColor;
 
+layout(push_constant) uniform params_t
+{
+  mat4 mProjView;
+  mat4 mModel;
+  vec3 mColor;
+} params;
+
 layout (location = 0 ) in VS_OUT
 {
   vec3 wPos;
@@ -21,6 +28,50 @@ layout(binding = 0, set = 0) uniform AppData
 
 layout (binding = 1) uniform sampler2D shadowMap;
 
+vec3 T(float s)
+{
+  const vec3 coeff1 = vec3(0.233f, 0.455f, 0.649f);
+  const vec3 coeff2 = vec3(0.1f, 0.336f, 0.344f);
+  const vec3 coeff3 = vec3(0.118f, 0.198f, 0.0f);
+  const vec3 coeff4 = vec3(0.113f, 0.007f, 0.007f);
+  const vec3 coeff5 = vec3(0.358f, 0.004f, 0.0f);
+  const vec3 coeff6 = vec3(0.078f, 0.0f, 0.0f);
+
+  const float div1 = 0.0064f;
+  const float div2 = 0.0484f;
+  const float div3 = 0.187f;
+  const float div4 = 0.567f;
+  const float div5 = 1.99f;
+  const float div6 = 7.41f;
+
+  float s2 = s * s;
+
+  return coeff1 * exp(-s2 / div1) +
+         coeff2 * exp(-s2 / div2) +
+         coeff3 * exp(-s2 / div3) +
+         coeff4 * exp(-s2 / div4) +
+         coeff5 * exp(-s2 / div5) +
+         coeff6 * exp(-s2 / div6);
+}
+
+float getLinearDepth(vec2 texCoord)
+{
+  float depth = texture(shadowMap, texCoord).x;
+  vec4 shrinkedPos = Params.lightMatrix * vec4(texCoord, depth, 1.0f);
+  vec3 shwpos = shrinkedPos.xyz / shrinkedPos.w;
+  float d1 = texture(shadowMap, shwpos.xy * 0.5f).x;
+  float d2 = shwpos.z;
+  return abs(d1 - d2);
+}
+
+vec4 transmittance(vec2 texCoord, vec3 lightDir, vec4 color)
+{
+  float depth = getLinearDepth(texCoord);
+  float s = depth * 1.5;
+  float E = max(0.3f + dot(-surf.wNorm, lightDir), 0.0f);
+  return vec4(T(s), 1.0f) * color * E;
+}
+
 void main()
 {
   const vec4 posLightClipSpace = Params.lightMatrix*vec4(surf.wPos, 1.0f); // 
@@ -33,10 +84,15 @@ void main()
   const vec4 dark_violet = vec4(0.59f, 0.0f, 0.82f, 1.0f);
   const vec4 chartreuse  = vec4(0.5f, 1.0f, 0.0f, 1.0f);
 
-  vec4 lightColor1 = mix(dark_violet, chartreuse, abs(sin(Params.time)));
+  vec4 lightColor1 = vec4(params.mColor, 1.0f);
   vec4 lightColor2 = vec4(1.0f, 1.0f, 1.0f, 1.0f);
    
   vec3 lightDir   = normalize(Params.lightPos - surf.wPos);
   vec4 lightColor = max(dot(surf.wNorm, lightDir), 0.0f) * lightColor1;
   out_fragColor   = (lightColor*shadow + vec4(0.1f)) * vec4(Params.baseColor, 1.0f);
+
+  if (Params.useSubsurfaceScattering)
+  {
+    out_fragColor += transmittance(shadowTexCoord, lightDir, lightColor1);
+  }
 }
