@@ -17,12 +17,18 @@ void SimpleShadowmapRender::AllocateResources()
 {
   mainViewDepth = m_context->createImage(etna::Image::CreateInfo
   {
-    .extent = vk::Extent3D{m_width, m_height, 1},
+    .extent = vk::Extent3D{ m_width * 2, m_height * 2, 1 },
     .name = "main_view_depth",
     .format = vk::Format::eD32Sfloat,
     .imageUsage = vk::ImageUsageFlagBits::eDepthStencilAttachment
   });
-
+  mainView = m_context->createImage(etna::Image::CreateInfo
+  {
+    .extent     = vk::Extent3D{ m_width * 2, m_height * 2, 1 },
+    .name       = "main_view",
+    .format     = vk::Format::eR32G32B32A32Sfloat,
+    .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc, 
+  });
   shadowMap = m_context->createImage(etna::Image::CreateInfo
   {
     .extent = vk::Extent3D{2048, 2048, 1},
@@ -109,7 +115,7 @@ void SimpleShadowmapRender::SetupSimplePipeline()
       .vertexShaderInput = sceneVertexInputDesc,
       .fragmentShaderOutput =
         {
-          .colorAttachmentFormats = {static_cast<vk::Format>(m_swapchain.GetFormat())},
+          .colorAttachmentFormats = {vk::Format::eR32G32B32A32Sfloat},
           .depthAttachmentFormat = vk::Format::eD32Sfloat
         }
     });
@@ -182,8 +188,8 @@ void SimpleShadowmapRender::BuildCommandBufferSimple(VkCommandBuffer a_cmdBuff, 
 
     VkDescriptorSet vkSet = set.getVkSet();
 
-    etna::RenderTargetState renderTargets(a_cmdBuff, {0, 0, m_width, m_height},
-      {{.image = a_targetImage, .view = a_targetImageView}},
+    etna::RenderTargetState renderTargets(a_cmdBuff, { 0, 0, m_width * (m_ssaa ? 2 : 1), m_height * (m_ssaa ? 2 : 1) },
+      {{.image = mainView.get(), .view = mainView.getView({})}},
       {.image = mainViewDepth.get(), .view = mainViewDepth.getView({})});
 
     vkCmdBindPipeline(a_cmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, m_basicForwardPipeline.getVkPipeline());
@@ -192,6 +198,26 @@ void SimpleShadowmapRender::BuildCommandBufferSimple(VkCommandBuffer a_cmdBuff, 
 
     DrawSceneCmd(a_cmdBuff, m_worldViewProj, m_basicForwardPipeline.getVkPipelineLayout());
   }
+
+  etna::set_state(a_cmdBuff, mainView.get(), vk::PipelineStageFlagBits2::eTransfer, vk::AccessFlagBits2::eTransferRead, vk::ImageLayout::eTransferSrcOptimal, vk::ImageAspectFlagBits::eColor);
+  etna::set_state(a_cmdBuff, a_targetImage, vk::PipelineStageFlagBits2::eTransfer, vk::AccessFlagBits2::eTransferWrite, vk::ImageLayout::eTransferDstOptimal, vk::ImageAspectFlagBits::eColor);
+  etna::flush_barriers(a_cmdBuff);
+
+  VkImageBlit blit{};
+  blit.srcOffsets[0]                 = { 0, 0, 0 };
+  blit.srcOffsets[1]                 = { int32_t(m_width * (m_ssaa ? 2 : 1)), int32_t(m_height * (m_ssaa ? 2 : 1)), 1 };
+  blit.srcSubresource.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+  blit.srcSubresource.mipLevel       = 0;
+  blit.srcSubresource.baseArrayLayer = 0;
+  blit.srcSubresource.layerCount     = 1;
+  blit.dstOffsets[0]                 = { 0, 0, 0 };
+  blit.dstOffsets[1]                 = { int32_t(m_width), int32_t(m_height), 1 };
+  blit.dstSubresource.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+  blit.dstSubresource.mipLevel       = 0;
+  blit.dstSubresource.baseArrayLayer = 0;
+  blit.dstSubresource.layerCount     = 1;
+
+  vkCmdBlitImage(a_cmdBuff, mainView.get(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, a_targetImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
 
   if(m_input.drawFSQuad)
     m_pQuad->RecordCommands(a_cmdBuff, a_targetImage, a_targetImageView, shadowMap, defaultSampler);
