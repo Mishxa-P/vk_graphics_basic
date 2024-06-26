@@ -50,6 +50,11 @@ private:
   etna::Sampler defaultSampler;
   etna::Buffer constants;
 
+  etna::Image colorMap;
+
+  float m_lightIntensity{ 4.0f };
+  bool m_useToneMapping{ false };
+
   VkCommandPool    m_commandPool    = VK_NULL_HANDLE;
 
   struct
@@ -77,6 +82,7 @@ private:
 
   etna::GraphicsPipeline m_basicForwardPipeline {};
   etna::GraphicsPipeline m_shadowPipeline {};
+  etna::GraphicsPipeline m_toneMappingPipeline {};
   
   VkSurfaceKHR m_surface = VK_NULL_HANDLE;
   VulkanSwapChain m_swapchain;
